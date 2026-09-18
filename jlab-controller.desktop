@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=JLab Headphone Controller
+Comment=Equalizer, ANC, and Device Manager for JLab Bluetooth Headphones
+Exec=/home/punit/Local_Codebase/Projects/Ideas/jlab-linux-controller/.venv/bin/python3 /home/punit/Local_Codebase/Projects/Ideas/jlab-linux-controller/main.py
+Icon=/home/punit/Local_Codebase/Projects/Ideas/jlab-linux-controller/jlab_controller/gui/assets/icon.png
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Settings;HardwareSettings;
+Keywords=JLab;Headphones;Equalizer;ANC;Noise Cancellation;Bluetooth;
+StartupNotify=true
