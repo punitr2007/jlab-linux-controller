@@ -182,43 +182,53 @@ class JieLiEncoder:
             cls._sn_counter = 1
         return cls._sn_counter
 
+    # Native device scale for voice mode intensity (from JLab AncView4Jieli: leftMax defaults to 16384)
+    _VOICE_MODE_MAX_NATIVE = 16384
+
     @classmethod
     def build_set_voice_mode(
         cls,
         mode: int,
         awareness_level: int = 75,
-        left_max: int = 100,
-        right_max: int = 100,
-        has_response: bool = False,
     ) -> JieLiPacket:
-        """Builds SetSysInfo command for Noise Control (ANC ON=1, Be Aware=2, OFF=0)."""
-        # VoiceMode byte structure:
-        # Byte 0: mode
-        # Bytes 1-2: leftMax (BE uint16)
-        # Bytes 3-4: rightMax (BE uint16)
-        # Bytes 5-6: leftCurVal (BE uint16)
-        # Bytes 7-8: rightCurVal (BE uint16)
-        cur_val = max(0, min(100, awareness_level))
+        """Builds SetSysInfo command for Noise Control (ANC ON=1, Be Aware=2, OFF=0).
+        
+        awareness_level: 0..100 (percentage). Internally scaled to 0..16384 (native device scale).
+        SetSysInfoCmd extends CommandWithParamAndResponse so has_response MUST be True.
+        
+        VoiceMode 9-byte layout (from VoiceMode.java getBytes()):
+          [0]   = mode
+          [1,2] = leftMax  (BE uint16, native max = 16384)
+          [3,4] = rightMax (BE uint16, native max = 16384)
+          [5,6] = leftCurVal  (BE uint16, scaled from 0..100%)
+          [7,8] = rightCurVal (BE uint16, same as leftCurVal for mono channel)
+        """
+        # Scale 0..100% -> 0..16384 native device range
+        pct = max(0, min(100, awareness_level))
+        cur_val = int(pct / 100.0 * cls._VOICE_MODE_MAX_NATIVE)
+        left_max = cls._VOICE_MODE_MAX_NATIVE
+        right_max = cls._VOICE_MODE_MAX_NATIVE
+
         attr_data = bytes([
             mode & 0xFF,
-            (left_max >> 8) & 0xFF, left_max & 0xFF,
-            (right_max >> 8) & 0xFF, right_max & 0xFF,
-            (cur_val >> 8) & 0xFF, cur_val & 0xFF,
-            (cur_val >> 8) & 0xFF, cur_val & 0xFF,
+            (left_max >> 8) & 0xFF, left_max & 0xFF,    # leftMax
+            (right_max >> 8) & 0xFF, right_max & 0xFF,  # rightMax
+            (cur_val >> 8) & 0xFF, cur_val & 0xFF,      # leftCurVal
+            (cur_val >> 8) & 0xFF, cur_val & 0xFF,      # rightCurVal
         ])
-        
-        # AttrBean: [len + 1, type, attr_data...]
-        attr_len = len(attr_data) + 1  # 10
+
+        # AttrBean.toData(): [attrData.len + 1, type, attrData...]
+        attr_len = len(attr_data) + 1  # = 10
         attr_bean = bytes([attr_len, ATTR_CURRENT_VOICE_MODE]) + attr_data
 
-        # SetSysInfoParam: [function=0xFF] + AttrBean
+        # SetSysInfoParam.getParamData(): [function=0xFF] + AttrBeans
         payload = bytes([FUNC_PUBLIC]) + attr_bean
 
         return JieLiPacket(
             op_code=OP_SET_SYS_INFO,
             payload=payload,
             sn=cls._next_sn(),
-            has_response=has_response,
+            has_response=True,   # SetSysInfoCmd extends CommandWithParamAndResponse
             is_command=True,
         )
 
@@ -227,12 +237,12 @@ class JieLiEncoder:
         cls,
         mode: int,
         gains: Optional[List[Union[int, float]]] = None,
-        has_response: bool = False,
     ) -> JieLiPacket:
         """Builds SetSysInfo command for 10-band Equalizer presets or custom gains.
         
         Modes: 0=Signature, 1=Balanced, 2=Bass Boost, 6=Custom.
         Gains: 10 signed integers in dB range (-12 to +12).
+        SetSysInfoCmd extends CommandWithParamAndResponse so has_response MUST be True.
         """
         gain_bytes = bytearray(10)
         if gains and len(gains) == 10:
@@ -245,18 +255,18 @@ class JieLiEncoder:
         # AttrData: [mode, gain0, gain1, ..., gain9] (11 bytes)
         attr_data = bytes([mode & 0xFF]) + bytes(gain_bytes)
 
-        # AttrBean: [len + 1, type, attr_data...]
-        attr_len = len(attr_data) + 1  # 12
+        # AttrBean.toData(): [attrData.len + 1, type, attrData...]
+        attr_len = len(attr_data) + 1  # = 12
         attr_bean = bytes([attr_len, ATTR_EQ]) + attr_data
 
-        # SetSysInfoParam: [function=0xFF] + AttrBean
+        # SetSysInfoParam.getParamData(): [function=0xFF] + AttrBeans
         payload = bytes([FUNC_PUBLIC]) + attr_bean
 
         return JieLiPacket(
             op_code=OP_SET_SYS_INFO,
             payload=payload,
             sn=cls._next_sn(),
-            has_response=has_response,
+            has_response=True,   # SetSysInfoCmd extends CommandWithParamAndResponse
             is_command=True,
         )
 

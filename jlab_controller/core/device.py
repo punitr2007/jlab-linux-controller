@@ -167,8 +167,6 @@ class JLabDevice:
             pkt = JieLiEncoder.build_set_voice_mode(
                 mode=jl_mode,
                 awareness_level=self.awareness_level,
-                left_max=100,
-                right_max=100,
             )
             res = self.connection.send_packet(pkt)
         else:
@@ -198,8 +196,6 @@ class JLabDevice:
             pkt = JieLiEncoder.build_set_voice_mode(
                 mode=jl_mode,
                 awareness_level=self.awareness_level,
-                left_max=100,
-                right_max=100,
             )
             res = self.connection.send_packet(pkt)
         else:
@@ -298,7 +294,9 @@ class JLabDevice:
                             self.anc_mode = AncMode.OFF
 
                         if len(attr_body) >= 7:
-                            self.awareness_level = (attr_body[5] << 8) | attr_body[6]
+                            # Device sends native 0..16384 scale; convert to 0..100%
+                            raw_val = (attr_body[5] << 8) | attr_body[6]
+                            self.awareness_level = int(raw_val / 16384.0 * 100)
                         logger.info(f"JieLi: VoiceMode updated to {self.anc_mode.name}, Awareness={self.awareness_level}%")
                         self._notify_update()
 
